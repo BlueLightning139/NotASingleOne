@@ -205,6 +205,9 @@
 
   </div>
 <script>
+    // ⚠️ REEMPLAZA ESTA URL CON LA QUE COPIASTE DE APPS SCRIPT (la que termina en /exec)
+    const API_URL = "https://script.google.com/macros/s/AKfycbyRDI7RJ2pneGNeac9CsYAscH1graj4mojw-LdHlthtAp910yYJy1gISzsgIu0wZHC0cQ/exec";
+
     let idFilaSeleccionada = null;
 
     function buscarMiembro() {
@@ -214,8 +217,10 @@
 
       contenedor.innerHTML = "<p>Cargando coincidencias...</p>";
 
-      google.script.run
-        .withSuccessHandler(function(json) {
+      // Cambiamos google.script.run por fetch()
+      fetch(`${API_URL}?accion=buscar&texto=${encodeURIComponent(texto)}`)
+        .then(res => res.json())
+        .then(json => {
           contenedor.innerHTML = "";
           if (json.exito && json.resultados.length > 0) {
             json.resultados.forEach(item => {
@@ -229,7 +234,7 @@
             contenedor.innerHTML = "<p>No se encontraron coincidencias.</p>";
           }
         })
-        .buscarMiembroServer(texto);
+        .catch(err => alert("Error al buscar: " + err));
     }
 
     function seleccionarMiembro(idFila, nombreCompleto) {
@@ -243,20 +248,22 @@
       document.getElementById("pantalla-validacion").classList.add("oculto");
       document.getElementById("pantalla-busqueda").classList.remove("oculto");
     }
+
     function validarFecha() {
       const fecha = document.getElementById("input-fecha").value;
       if (!fecha) return alert("Ingresa tu fecha de nacimiento.");
 
-      google.script.run
-        .withSuccessHandler(function(json) {
+      // Cambiamos google.script.run por fetch()
+      fetch(`${API_URL}?accion=validar&idFila=${idFilaSeleccionada}&fecha=${encodeURIComponent(fecha)}`)
+        .then(res => res.json())
+        .then(json => {
           if (json.exito) {
-            // Pasamos el objeto 'json' completo para evitar problemas de compatibilidad
             mostrarSubpaginaEdicion(json);
           } else {
             alert(json.mensaje);
           }
         })
-        .validarFechaServer(idFilaSeleccionada, fecha);
+        .catch(err => alert("Error al validar: " + err));
     }
 
     function mostrarSubpaginaEdicion(json) {
@@ -273,7 +280,6 @@
       gOtros.innerHTML = "";
 
       let listaCampos = [];
-
       if (json.columnas && Array.isArray(json.columnas)) {
         listaCampos = json.columnas;
       } else if (json.datos && Array.isArray(json.datos)) {
@@ -283,20 +289,13 @@
         listaCampos = Object.keys(fuenteDatos).map(k => ({ nombre: k, valor: fuenteDatos[k] }));
       }
 
-      // Función única para limpiar textos (minúsculas, sin tildes, sin ñ)
       const limpiarTexto = (str) => 
-        String(str || "")
-           .toLowerCase()
-           .normalize("NFD")
-           .replace(/[\u0300-\u036f]/g, "")
-           .trim();
+        String(str || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 
       const ordenIdentidad = ["dni", "nombre", "apellido", "fecha", "llamemos"];
-      const ordenContacto = ["correo", "whatsapp", "distrito","tecnica", "san marcos","grado","honorario", "comision"];
-
+      const ordenContacto = ["correo", "whatsapp", "distrito", "tecnica", "san marcos", "grado", "honorario", "comision"];
       const camposProcesados = new Set();
 
-      // DICCIONARIO DE OPCIONES (Llaves en minúsculas y sin caracteres especiales)
       const opcionesDesplegables = {
         "cumpleanos": ["Un flyer que aparezca en el chat de miembros", "Un saludo rápido por chat/email.", "Prefiero que sea reservado, ¡pero gracias!"],
         "merito": ["Un flyer que aparezca en el chat de miembros", "Un saludo rápido por chat/email.", "Prefiero que sea reservado, ¡pero gracias!"],
@@ -314,19 +313,17 @@
         const keyLimpia = limpiarTexto(keyOriginal);
         const esDNI = keyLimpia === "dni";
 
-        // Muestra asterisco rojo si el campo es obligatorio
         label.innerHTML = esObligatorio || esDNI 
           ? `${keyOriginal} <span style="color:red;">* (Obligatorio)</span>` 
           : keyOriginal;
 
         const reglaDesplegable = Object.keys(opcionesDesplegables).find(patron => keyLimpia.includes(patron));
-
         let inputControl;
 
         if (reglaDesplegable) {
           inputControl = document.createElement("select");
           inputControl.name = keyOriginal;
-          if (esObligatorio || esDNI) inputControl.required = true; // Exige selección
+          if (esObligatorio || esDNI) inputControl.required = true;
           inputControl.style.width = "100%";
           inputControl.style.padding = "10px";
           inputControl.style.marginTop = "5px";
@@ -342,19 +339,17 @@
             const opt = document.createElement("option");
             opt.value = opcionTexto;
             opt.text = opcionTexto;
-
             if (String(valorOriginal).trim().toLowerCase() === opcionTexto.toLowerCase()) {
               opt.selected = true;
             }
             inputControl.appendChild(opt);
           });
-
         } else {
           inputControl = document.createElement("input");
           inputControl.type = "text";
           inputControl.name = keyOriginal;
           inputControl.value = valorOriginal || "";
-          if (esObligatorio || esDNI) inputControl.required = true; // Exige texto
+          if (esObligatorio || esDNI) inputControl.required = true;
 
           if (esDNI) {
             inputControl.className = "input-dni";
@@ -367,7 +362,6 @@
         return div;
       }
 
-      // 1. SECCIÓN IDENTIDAD (Obligatorios -> true)
       ordenIdentidad.forEach(patron => {
         listaCampos.forEach(item => {
           const keyLimpia = limpiarTexto(item.nombre);
@@ -378,7 +372,6 @@
         });
       });
 
-      // 2. SECCIÓN CONTACTO (Obligatorios -> true)
       ordenContacto.forEach(patron => {
         listaCampos.forEach(item => {
           const keyLimpia = limpiarTexto(item.nombre);
@@ -389,7 +382,6 @@
         });
       });
 
-      // 3. SECCIÓN OTROS (Opcionales -> false por defecto)
       listaCampos.forEach(item => {
         if (!camposProcesados.has(item.nombre)) {
           gOtros.appendChild(crearCampoHTML(item.nombre, item.valor, false));
@@ -397,11 +389,11 @@
         }
       });
     }
-   function guardarCambios(e) {
+
+    function guardarCambios(e) {
       e.preventDefault();
       const form = document.getElementById("form-edicion");
 
-      // Dispara las validaciones 'required' nativas de HTML5
       if (!form.checkValidity()) {
         form.reportValidity();
         return;
@@ -411,18 +403,11 @@
       let datosActualizados = {};
       let dniValor = "";
 
-      const limpiarTexto = (str) => 
-        String(str || "")
-           .toLowerCase()
-           .normalize("NFD")
-           .replace(/[\u0300-\u036f]/g, "")
-           .trim();
+      const limpiarTexto = (str) => String(str || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 
       formData.forEach((value, key) => {
         datosActualizados[key] = value;
-        if (limpiarTexto(key).includes("dni")) {
-          dniValor = String(value).trim();
-        }
+        if (limpiarTexto(key).includes("dni")) dniValor = String(value).trim();
       });
 
       const soloNumeros = /^\d+$/;
@@ -431,16 +416,24 @@
         return;
       }
 
-      google.script.run
-        .withSuccessHandler(function(json) {
-          if (json.exito) {
-            alert("¡Tus datos han sido actualizados exitosamente!");
-            location.reload();
-          } else {
-            alert("Error: " + json.mensaje);
-          }
+      // Cambiamos google.script.run por fetch() POST
+      fetch(API_URL, {
+        method: "POST",
+        body: JSON.stringify({
+          idFila: idFilaSeleccionada,
+          datos: datosActualizados
         })
-        .guardarDatosServer(idFilaSeleccionada, datosActualizados);
+      })
+      .then(res => res.json())
+      .then(json => {
+        if (json.exito) {
+          alert("¡Tus datos han sido actualizados exitosamente!");
+          location.reload();
+        } else {
+          alert("Error: " + json.mensaje);
+        }
+      })
+      .catch(err => alert("Error al guardar: " + err));
     }
 </script>
 </body>
